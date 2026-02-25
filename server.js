@@ -10,6 +10,16 @@ app.get('/', (_req, res) => {
     const mins = Math.floor((uptime % 3600) / 60);
     const secs = Math.floor(uptime % 60);
 
+    const now = new Date();
+    const deployTime = now.toLocaleDateString('en-US', {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
+    });
+
+    const isDev = !APP_VERSION || APP_VERSION === 'dev';
+    const shaShort = isDev ? 'dev' : APP_VERSION.substring(0, 7);
+    const shaFull = isDev ? 'dev' : APP_VERSION;
+
     res.send(/*html*/`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,11 +58,26 @@ app.get('/', (_req, res) => {
         </div>
         <div class="bg-gray-800/50 rounded-xl p-4">
           <p class="text-xs text-gray-400 uppercase tracking-wide">Server Time</p>
-          <p class="text-lg font-mono font-semibold mt-1">${new Date().toLocaleTimeString()}</p>
+          <p class="text-lg font-mono font-semibold mt-1">${now.toLocaleTimeString()}</p>
         </div>
         <div class="bg-gray-800/50 rounded-xl p-4 col-span-2">
           <p class="text-xs text-gray-400 uppercase tracking-wide">Version (commit SHA)</p>
-          <p class="text-lg font-mono font-semibold mt-1 truncate">${APP_VERSION}</p>
+          <div class="flex items-center gap-2 mt-1">
+            <p class="text-lg font-mono font-semibold truncate" title="${shaFull}">${shaFull}</p>
+            <button
+              id="copy-sha"
+              onclick="copySHA()"
+              ${isDev ? 'disabled' : ''}
+              class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition
+                     ${isDev
+            ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            : 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white cursor-pointer'}"
+            >${isDev ? 'N/A' : '📋 Copy'}</button>
+          </div>
+        </div>
+        <div class="bg-gray-800/50 rounded-xl p-4 col-span-2">
+          <p class="text-xs text-gray-400 uppercase tracking-wide">Last Deploy</p>
+          <p class="text-lg font-mono font-semibold mt-1">${deployTime}</p>
         </div>
       </div>
 
@@ -77,6 +102,23 @@ app.get('/', (_req, res) => {
       Built with Express &amp; Tailwind CDN &middot; zero build step
     </p>
   </div>
+
+  <script>
+    function copySHA() {
+      const sha = '${shaFull}';
+      const btn = document.getElementById('copy-sha');
+      navigator.clipboard.writeText(sha).then(() => {
+        btn.textContent = '✓ Copied!';
+        btn.classList.replace('bg-gray-700', 'bg-emerald-700');
+        btn.classList.add('text-emerald-200');
+        setTimeout(() => {
+          btn.textContent = '📋 Copy';
+          btn.classList.replace('bg-emerald-700', 'bg-gray-700');
+          btn.classList.remove('text-emerald-200');
+        }, 1500);
+      });
+    }
+  </script>
 </body>
 </html>`);
 });
