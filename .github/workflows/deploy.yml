@@ -39,4 +39,18 @@ jobs:
             cd ~/app
             docker-compose pull
             docker-compose up -d
-            curl -f http://localhost/health
+
+            echo "Waiting for health check..."
+            for i in $(seq 1 30); do
+              if curl -fsS http://localhost/health > /dev/null; then
+                echo "✅ Healthy!"
+                exit 0
+              fi
+              echo "Not healthy yet (attempt $i/30). Retrying..."
+              sleep 1
+            done
+
+            echo "❌ Health check failed after 30s"
+            docker-compose ps
+            docker-compose logs --tail=200 web
+            exit 1
