@@ -40,11 +40,15 @@ jobs:
             cd ~/app
 
             docker compose pull
+
+            # Update APP_VERSION on the server so the container can display the deployed commit SHA
+            sed -i "s/^APP_VERSION=.*/APP_VERSION=$GITHUB_SHA/" ~/app/.env || echo "APP_VERSION=$GITHUB_SHA" >> ~/app/.env
+
             docker compose up -d
 
             echo "Waiting for health check..."
             for i in $(seq 1 60); do
-              # Try port 3000 directly first (container), then port 80 (host mapping)
+              # Try container port first, then host-mapped port
               if curl -fsS http://localhost:3000/health > /dev/null; then
                 echo "✅ Healthy on 3000!"
                 exit 0
