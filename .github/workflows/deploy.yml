@@ -3,10 +3,12 @@ name: DeployBot
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: write
@@ -39,10 +41,10 @@ jobs:
             set -e
             cd ~/app
 
-            # Always pull the newest image
+            # Pull newest image
             docker compose pull
 
-            # Ensure .env exists and write APP_VERSION using the runner's SHA (NOT $GITHUB_SHA on EC2)
+            # Write APP_VERSION safely using runner SHA (EC2 won't have $GITHUB_SHA)
             touch ~/app/.env
             SHA="${{ github.sha }}"
             if grep -q '^APP_VERSION=' ~/app/.env; then
@@ -51,17 +53,15 @@ jobs:
               echo "APP_VERSION=$SHA" >> ~/app/.env
             fi
 
-            # Restart with updated env + image
-            docker compose up -d
+            # Clean recreate prevents flaky "no such container" errors
+            docker compose down --remove-orphans || true
+            docker compose up -d --force-recreate --remove-orphans
 
             echo "Waiting for health check..."
+            sleep 2
             for i in $(seq 1 60); do
               if curl -fsS http://localhost:3000/health > /dev/null; then
-                echo "✅ Healthy on 3000!"
-                exit 0
-              fi
-              if curl -fsS http://localhost/health > /dev/null; then
-                echo "✅ Healthy on 80!"
+                echo "✅ Healthy!"
                 exit 0
               fi
               echo "Not healthy yet (attempt $i/60). Retrying..."
@@ -72,3 +72,12 @@ jobs:
             docker compose ps || true
             docker compose logs --tail=200 web || true
             exit 1
+
+      - name: Deploy summary
+        if: always()
+        run: |
+          echo "### 🚀 DeployBot Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Server: \`${{ secrets.EC2_HOST }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Dashboard: http://${{ secrets.EC2_HOST }}/" >> $GITHUB_STEP_SUMMARY
+          echo "- Health: http://${{ secrets.EC2_HOST }}/health" >> $GITHUB_STEP_SUMMARY
