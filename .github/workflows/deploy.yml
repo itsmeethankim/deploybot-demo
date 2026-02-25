@@ -38,11 +38,13 @@ jobs:
           script: |
             set -e
             cd ~/app
+            touch ~/app/.env
 
             docker compose pull
 
-            # Update APP_VERSION on the server so the container can display the deployed commit SHA
-            sed -i "s/^APP_VERSION=.*/APP_VERSION=$GITHUB_SHA/" ~/app/.env || echo "APP_VERSION=$GITHUB_SHA" >> ~/app/.env
+            grep -q '^APP_VERSION=' ~/app/.env && \
+              sed -i "s/^APP_VERSION=.*/APP_VERSION=$GITHUB_SHA/" ~/app/.env || \
+              echo "APP_VERSION=$GITHUB_SHA" >> ~/app/.env
 
             docker compose up -d
 
