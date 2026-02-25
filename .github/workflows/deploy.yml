@@ -42,9 +42,11 @@ jobs:
 
             docker compose pull
 
-            grep -q '^APP_VERSION=' ~/app/.env && \
-              sed -i "s/^APP_VERSION=.*/APP_VERSION=$GITHUB_SHA/" ~/app/.env || \
+            if grep -q '^APP_VERSION=' ~/app/.env; then
+              sed -i "s/^APP_VERSION=.*/APP_VERSION=$GITHUB_SHA/" ~/app/.env
+            else
               echo "APP_VERSION=$GITHUB_SHA" >> ~/app/.env
+            fi
 
             docker compose up -d
 
