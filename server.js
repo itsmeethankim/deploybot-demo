@@ -54,11 +54,11 @@ app.get('/', (_req, res) => {
       <div class="grid grid-cols-2 gap-4">
         <div class="bg-gray-800/50 rounded-xl p-4">
           <p class="text-xs text-gray-400 uppercase tracking-wide">Uptime</p>
-          <p class="text-lg font-mono font-semibold mt-1">${hours}h ${mins}m ${secs}s</p>
+          <p id="uptime" class="text-lg font-mono font-semibold mt-1">${hours}h ${mins}m ${secs}s</p>
         </div>
         <div class="bg-gray-800/50 rounded-xl p-4">
           <p class="text-xs text-gray-400 uppercase tracking-wide">Server Time</p>
-          <p class="text-lg font-mono font-semibold mt-1">${now.toLocaleTimeString()}</p>
+          <p id="server-time" class="text-lg font-mono font-semibold mt-1">${now.toLocaleTimeString()}</p>
         </div>
         <div class="bg-gray-800/50 rounded-xl p-4 col-span-2">
           <p class="text-xs text-gray-400 uppercase tracking-wide">Version (commit SHA)</p>
@@ -77,7 +77,7 @@ app.get('/', (_req, res) => {
         </div>
         <div class="bg-gray-800/50 rounded-xl p-4 col-span-2">
           <p class="text-xs text-gray-400 uppercase tracking-wide">Last Deploy</p>
-          <p class="text-lg font-mono font-semibold mt-1">${deployTime}</p>
+          <p id="last-deploy" class="text-lg font-mono font-semibold mt-1">${deployTime}</p>
         </div>
       </div>
 
@@ -104,10 +104,20 @@ app.get('/', (_req, res) => {
   </div>
 
   <script>
+    // ── HTTP-safe clipboard (navigator.clipboard needs HTTPS) ──
     function copySHA() {
       const sha = '${shaFull}';
       const btn = document.getElementById('copy-sha');
-      navigator.clipboard.writeText(sha).then(() => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = sha;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+
         btn.textContent = '✓ Copied!';
         btn.classList.replace('bg-gray-700', 'bg-emerald-700');
         btn.classList.add('text-emerald-200');
@@ -116,8 +126,32 @@ app.get('/', (_req, res) => {
           btn.classList.replace('bg-emerald-700', 'bg-gray-700');
           btn.classList.remove('text-emerald-200');
         }, 1500);
-      });
+      } catch(e) {
+        btn.textContent = '⚠ Failed';
+        setTimeout(() => { btn.textContent = '📋 Copy'; }, 1500);
+      }
     }
+
+    // ── Live-update metrics every 2s ──
+    function fmtUptime(s) {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = Math.floor(s % 60);
+      return h + 'h ' + m + 'm ' + sec + 's';
+    }
+    async function refresh() {
+      try {
+        const r = await fetch('/health');
+        const d = await r.json();
+        document.getElementById('uptime').textContent = fmtUptime(d.uptime);
+        document.getElementById('server-time').textContent = new Date().toLocaleTimeString();
+        document.getElementById('last-deploy').textContent = new Date(d.timestamp).toLocaleString('en-US', {
+          weekday:'short', year:'numeric', month:'short', day:'numeric',
+          hour:'2-digit', minute:'2-digit', second:'2-digit', timeZoneName:'short'
+        });
+      } catch(e) {}
+    }
+    setInterval(refresh, 2000);
   </script>
 </body>
 </html>`);
