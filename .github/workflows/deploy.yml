@@ -41,10 +41,10 @@ jobs:
             set -e
             cd ~/app
 
-            # Pull newest image
+            echo "==> Pulling newest image"
             docker compose pull
 
-            # Write APP_VERSION safely using runner SHA (EC2 won't have $GITHUB_SHA)
+            echo "==> Writing APP_VERSION"
             touch ~/app/.env
             SHA="${{ github.sha }}"
             if grep -q '^APP_VERSION=' ~/app/.env; then
@@ -53,15 +53,16 @@ jobs:
               echo "APP_VERSION=$SHA" >> ~/app/.env
             fi
 
-            # Clean recreate prevents flaky "no such container" errors
+            echo "==> Recreate containers (clean deploy)"
             docker compose down --remove-orphans || true
             docker compose up -d --force-recreate --remove-orphans
 
-            echo "Waiting for health check..."
+            echo "==> Waiting for health check on host port 80 (/health)"
             sleep 2
             for i in $(seq 1 60); do
-              if curl -fsS http://localhost:3000/health > /dev/null; then
+              if curl -fsS http://localhost/health > /tmp/health.json; then
                 echo "✅ Healthy!"
+                cat /tmp/health.json
                 exit 0
               fi
               echo "Not healthy yet (attempt $i/60). Retrying..."
@@ -71,6 +72,8 @@ jobs:
             echo "❌ Health check failed after 60s"
             docker compose ps || true
             docker compose logs --tail=200 web || true
+            echo "Verbose curl:"
+            curl -v http://localhost/health || true
             exit 1
 
       - name: Deploy summary
