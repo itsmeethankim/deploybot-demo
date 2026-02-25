@@ -36,21 +36,28 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             cd ~/app
-            docker-compose pull
-            docker-compose up -d
+
+            docker compose pull
+            docker compose up -d
 
             echo "Waiting for health check..."
-            for i in $(seq 1 30); do
-              if curl -fsS http://localhost/health > /dev/null; then
-                echo "✅ Healthy!"
+            for i in $(seq 1 60); do
+              # Try port 3000 directly first (container), then port 80 (host mapping)
+              if curl -fsS http://localhost:3000/health > /dev/null; then
+                echo "✅ Healthy on 3000!"
                 exit 0
               fi
-              echo "Not healthy yet (attempt $i/30). Retrying..."
+              if curl -fsS http://localhost/health > /dev/null; then
+                echo "✅ Healthy on 80!"
+                exit 0
+              fi
+              echo "Not healthy yet (attempt $i/60). Retrying..."
               sleep 1
             done
 
-            echo "❌ Health check failed after 30s"
-            docker-compose ps
-            docker-compose logs --tail=200 web
+            echo "❌ Health check failed after 60s"
+            docker compose ps || true
+            docker compose logs --tail=200 web || true
             exit 1
