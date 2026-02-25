@@ -38,21 +38,24 @@ jobs:
           script: |
             set -e
             cd ~/app
-            touch ~/app/.env
 
+            # Always pull the newest image
             docker compose pull
 
+            # Ensure .env exists and write APP_VERSION using the runner's SHA (NOT $GITHUB_SHA on EC2)
+            touch ~/app/.env
+            SHA="${{ github.sha }}"
             if grep -q '^APP_VERSION=' ~/app/.env; then
-              sed -i "s/^APP_VERSION=.*/APP_VERSION=$GITHUB_SHA/" ~/app/.env
+              sed -i "s/^APP_VERSION=.*/APP_VERSION=$SHA/" ~/app/.env
             else
-              echo "APP_VERSION=$GITHUB_SHA" >> ~/app/.env
+              echo "APP_VERSION=$SHA" >> ~/app/.env
             fi
 
+            # Restart with updated env + image
             docker compose up -d
 
             echo "Waiting for health check..."
             for i in $(seq 1 60); do
-              # Try container port first, then host-mapped port
               if curl -fsS http://localhost:3000/health > /dev/null; then
                 echo "✅ Healthy on 3000!"
                 exit 0
